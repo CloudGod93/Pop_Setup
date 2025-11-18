@@ -1,0 +1,16 @@
+scripts:
+  - id: git
+    name: "Git"
+    description: "Install and configure Git"
+    script: "scripts/install_git.sh"
+    check: "scripts/check_git.sh"
+  - id: docker
+    name: "Docker"
+    description: "Install Docker and configure user access"
+    script: "scripts/install_docker.sh"
+    check: "scripts/check_docker.sh"
+  - id: conda
+    name: "Miniconda"
+    description: "Install Miniconda environment"
+    script: "scripts/install_conda.sh"
+    check: "scripts/check_conda.sh"

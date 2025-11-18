@@ -1,0 +1,12 @@
+profiles:
+  developer_pc:
+    description: "Full developer workstation"
+    scripts:
+      - git
+      - docker
+      - conda
+  project_pc:
+    description: "Project runtime machine"
+    scripts:
+      - git
+      - docker
