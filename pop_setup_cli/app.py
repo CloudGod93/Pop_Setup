@@ -15,31 +15,49 @@ def main() -> None:
     while True:
         choice = ui.prompt_main_menu()
         if choice == "1":
+            ui.clear_screen()
             profile_id = ui.prompt_install_mode()
+            if profile_id is None:
+                ui.show_message("Install cancelled.", "yellow")
+                ui.wait_for_enter()
+                continue
             profile = profiles.get(profile_id)
             if not profile:
-                print("Unknown profile selection.")
+                ui.show_message("Unknown profile selection.", "red")
+                ui.wait_for_enter()
                 continue
             heading = f"Install all ({profile.description or profile.id})"
             results = executor.run_profile(profile_id)
             ui.display_results(results, heading)
             ui.print_run_summary(results)
+            ui.wait_for_enter()
         elif choice == "2":
+            ui.clear_screen()
             selection = ui.prompt_script_selection(list(scripts.values()))
+            if selection is None:
+                ui.show_message("Selection cancelled.", "yellow")
+                ui.wait_for_enter()
+                continue
             if not selection:
+                ui.show_message("No scripts selected.", "yellow")
+                ui.wait_for_enter()
                 continue
             results = executor.run_scripts(selection)
             ui.display_results(results, "Install selected")
             ui.print_run_summary(results)
+            ui.wait_for_enter()
         elif choice == "3":
+            ui.clear_screen()
             results = executor.run_all_checks()
             ui.display_results(results, "System status")
             ui.print_check_summary(results)
+            ui.wait_for_enter()
         elif choice == "q":
-            print("Goodbye.")
+            ui.show_message("Goodbye.", "cyan")
             break
         else:
-            print("Invalid choice.")
+            ui.show_message("Invalid choice.", "red")
+            ui.wait_for_enter()
 
 
 if __name__ == "__main__":
