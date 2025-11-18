@@ -1,9 +1,19 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
+from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence
 
 from rich.console import Console
 from rich.panel import Panel
+from rich.progress import (
+    BarColumn,
+    Progress,
+    TaskID,
+    TextColumn,
+    TimeElapsedColumn,
+    TimeRemainingColumn,
+)
 from rich.table import Table
 
 from .models import ExecutionResult, Script
@@ -140,3 +150,51 @@ def show_message(message: str, style: str | None = None) -> None:
         console.print(f"[{style}]{message}[/{style}]")
     else:
         console.print(message)
+
+
+def show_status(message: str) -> None:
+    console.print(Panel.fit(message, border_style="cyan"))
+
+
+@dataclass
+class InstallProgress:
+    progress: Progress
+    overall_task: TaskID
+    current_task: TaskID
+
+    def hook(self, event: str, index: int, total: int, script: Script) -> None:
+        if total <= 0:
+            return
+        if event == "start":
+            description = f"[cyan]{script.name}[/cyan] ({index}/{total})"
+            self.progress.update(
+                self.current_task,
+                total=1,
+                completed=0,
+                description=description,
+                visible=True,
+            )
+        elif event == "end":
+            self.progress.update(self.current_task, completed=1)
+            self.progress.advance(self.overall_task)
+
+
+@contextmanager
+def install_progress(total_scripts: int):
+    if total_scripts <= 0:
+        yield None
+        return
+    columns = (
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(bar_width=None),
+        TextColumn("{task.completed}/{task.total}"),
+        TextColumn("{task.percentage:>3.0f}%"),
+        TimeElapsedColumn(),
+        TimeRemainingColumn(),
+    )
+    progress = Progress(*columns, console=console, transient=True)
+    with progress:
+        overall_task = progress.add_task("Overall", total=total_scripts)
+        current_task = progress.add_task("Current script", total=1)
+        tracker = InstallProgress(progress, overall_task, current_task)
+        yield tracker

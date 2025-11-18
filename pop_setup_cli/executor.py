@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
-from typing import Dict, List, Sequence
+from typing import Callable, Dict, List, Optional, Sequence
 
 from .models import ExecutionResult, Profile, Script
+
+ProgressHook = Callable[[str, int, int, Script], None]
 
 
 class Executor:
@@ -18,19 +20,32 @@ class Executor:
         self.profiles = profiles
         self.base_path = base_path
 
-    def run_profile(self, profile_id: str) -> List[ExecutionResult]:
+    def run_profile(
+        self,
+        profile_id: str,
+        progress_hook: Optional[ProgressHook] = None,
+    ) -> List[ExecutionResult]:
         if profile_id not in self.profiles:
             raise ValueError(f"Unknown profile '{profile_id}'")
         profile = self.profiles[profile_id]
-        return self.run_scripts(profile.scripts)
+        return self.run_scripts(profile.scripts, progress_hook=progress_hook)
 
-    def run_scripts(self, script_ids: Sequence[str]) -> List[ExecutionResult]:
+    def run_scripts(
+        self,
+        script_ids: Sequence[str],
+        progress_hook: Optional[ProgressHook] = None,
+    ) -> List[ExecutionResult]:
         results: List[ExecutionResult] = []
-        for script_id in script_ids:
+        total = len(script_ids)
+        for index, script_id in enumerate(script_ids, start=1):
             script = self.scripts.get(script_id)
             if not script:
                 raise ValueError(f"Unknown script '{script_id}'")
+            if progress_hook:
+                progress_hook("start", index, total, script)
             results.extend(self._run_install_flow(script))
+            if progress_hook:
+                progress_hook("end", index, total, script)
         return results
 
     def run_all_checks(self) -> List[ExecutionResult]:
