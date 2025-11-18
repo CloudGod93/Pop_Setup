@@ -1,12 +1,42 @@
 profiles:
   developer_pc:
-    description: "Full developer workstation"
+    description: "Full workstation with all dev tools"
     scripts:
-      - git
+      - system_prep
+      - nvidia_cuda
       - docker
+      - vscode
+      - google_chrome
+      - teamviewer
+      - thonny
+      - flatpak_apps
+      - zellij
+      - ventoy
+      - nodejs
+      - git
       - conda
+      - shell_env
+      - project_dirs
+      - clone_repos
+      - post_clone
+      - usb_sync
+      - desktop_shortcuts
+      - final_cleanup
   project_pc:
     description: "Project runtime machine"
     scripts:
-      - git
+      - system_prep
+      - nvidia_cuda
       - docker
+      - google_chrome
+      - flatpak_apps
+      - nodejs
+      - git
+      - conda
+      - shell_env
+      - project_dirs
+      - clone_repos
+      - post_clone
+      - usb_sync
+      - desktop_shortcuts
+      - final_cleanup

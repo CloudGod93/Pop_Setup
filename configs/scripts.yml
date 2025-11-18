@@ -1,16 +1,98 @@
 scripts:
-  - id: git
-    name: "Git"
-    description: "Install and configure Git"
-    script: "scripts/install_git.sh"
-    check: "scripts/check_git.sh"
+  - id: system_prep
+    name: "System prep"
+    description: "Update apt, remove conflicting packages, install core tools"
+    script: "scripts/install_system_prep.sh"
+    check: "scripts/check_system_prep.sh"
+  - id: nvidia_cuda
+    name: "NVIDIA + CUDA"
+    description: "Install NVIDIA driver, CUDA 11.8, and cuDNN"
+    script: "scripts/install_nvidia_cuda.sh"
+    check: "scripts/check_nvidia_cuda.sh"
   - id: docker
-    name: "Docker"
-    description: "Install Docker and configure user access"
+    name: "Docker Engine"
+    description: "Install Docker Engine and configure user access"
     script: "scripts/install_docker.sh"
     check: "scripts/check_docker.sh"
+  - id: vscode
+    name: "Visual Studio Code"
+    description: "Add Microsoft repo and install VS Code"
+    script: "scripts/install_vscode.sh"
+    check: "scripts/check_vscode.sh"
+  - id: google_chrome
+    name: "Google Chrome"
+    description: "Install Google Chrome browser"
+    script: "scripts/install_google_chrome.sh"
+    check: "scripts/check_google_chrome.sh"
+  - id: teamviewer
+    name: "TeamViewer"
+    description: "Download and install TeamViewer"
+    script: "scripts/install_teamviewer.sh"
+    check: "scripts/check_teamviewer.sh"
+  - id: thonny
+    name: "Thonny"
+    description: "Install Thonny Python IDE"
+    script: "scripts/install_thonny.sh"
+    check: "scripts/check_thonny.sh"
+  - id: flatpak_apps
+    name: "Flatpak apps"
+    description: "Configure system Flathub remote and install configured Flatpak apps"
+    script: "scripts/install_flatpak_apps.sh"
+    check: "scripts/check_flatpak_apps.sh"
+  - id: zellij
+    name: "Zellij"
+    description: "Install the Zellij terminal multiplexer"
+    script: "scripts/install_zellij.sh"
+    check: "scripts/check_zellij.sh"
+  - id: ventoy
+    name: "Ventoy"
+    description: "Install the Ventoy USB tool"
+    script: "scripts/install_ventoy.sh"
+    check: "scripts/check_ventoy.sh"
+  - id: nodejs
+    name: "Node.js via NVM"
+    description: "Install NVM and provision the preferred Node.js version"
+    script: "scripts/install_node_nvm.sh"
+    check: "scripts/check_node_nvm.sh"
+  - id: git
+    name: "Git configuration"
+    description: "Configure git identity and credential helper"
+    script: "scripts/install_git.sh"
+    check: "scripts/check_git.sh"
   - id: conda
     name: "Miniconda"
-    description: "Install Miniconda environment"
+    description: "Install and initialize Miniconda"
     script: "scripts/install_conda.sh"
     check: "scripts/check_conda.sh"
+  - id: shell_env
+    name: "Shell environment"
+    description: "Add CUDA/NVM blocks to shell configs and configure Alacritty"
+    script: "scripts/configure_shell_environment.sh"
+    check: "scripts/check_shell_environment.sh"
+  - id: project_dirs
+    name: "Project directories"
+    description: "Create required project directories"
+    script: "scripts/create_project_directories.sh"
+    check: "scripts/check_project_directories.sh"
+  - id: clone_repos
+    name: "Clone repositories"
+    description: "Clone Ribbing and Cattle Classification repositories"
+    script: "scripts/clone_project_repos.sh"
+    check: "scripts/check_clone_project_repos.sh"
+  - id: post_clone
+    name: "Post-clone setup"
+    description: "Run npm install and conda env setup for projects"
+    script: "scripts/project_post_clone_setup.sh"
+  - id: usb_sync
+    name: "USB data sync"
+    description: "Sync project data and documents from the USB drive"
+    script: "scripts/sync_from_usb.sh"
+  - id: desktop_shortcuts
+    name: "Desktop shortcuts"
+    description: "Deploy desktop shortcuts and launcher permissions"
+    script: "scripts/setup_desktop_shortcuts.sh"
+    check: "scripts/check_desktop_shortcuts.sh"
+  - id: final_cleanup
+    name: "Final cleanup"
+    description: "Clean apt caches and log completion"
+    script: "scripts/final_cleanup.sh"

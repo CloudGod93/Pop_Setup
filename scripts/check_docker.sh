@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if command -v docker >/dev/null 2>&1; then
-  echo "Docker already installed"
+  docker --version
   exit 0
 fi
 

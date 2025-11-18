@@ -9,7 +9,28 @@ A streamlined terminal companion for provisioning Pop!_OS developer and project 
 - **Profile-aware installs** – switch between `developer_pc` and `project_pc` bundles from YAML config.
 - **Composable scripts** – add install/check steps by dropping shell scripts into `scripts/` and registering them in config.
 - **Status-first UX** – concise `[OK]`, `[RUN]`, `[DONE]`, `[FAIL]` tags across install and check flows.
-- **Safe placeholders** – sample git/docker/conda scripts demonstrate the pattern without touching real packages.
+- **Safe placeholders** – sample git/docker/runtime scripts demonstrate the pattern without touching real packages.
+
+## ⚡ Fresh Machine Setup
+The bootstrap script handles everything for a brand-new Pop!_OS 22.04 machine:
+
+```bash
+git clone <repo>
+cd Pop_Setup
+bash bootstrap_pop_setup.sh
+```
+
+It verifies `python3`, installs `python3-venv` and `python3-pip` if needed, creates `.venv`, installs `requirements.txt`, and launches the CLI.
+
+## 🧰 Manual install without bootstrap
+Prefer manual control? Use standard `venv` and pip:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python -m pop_setup_cli
+```
 
 ## 🧩 Project Layout
 ```
@@ -26,17 +47,11 @@ A streamlined terminal companion for provisioning Pop!_OS developer and project 
 ├─ scripts/               # individual install/check scripts
 │  ├─ install_*.sh
 │  └─ check_*.sh
+├─ bootstrap_pop_setup.sh # venv bootstrap + CLI launcher
 └─ pop_setup.sh           # legacy reference (do not modify)
 ```
 
-## ⚙️ Quick Start
-```bash
-# optional: activate your virtualenv / conda env
-pip install -r requirements.txt  # if you add dependencies like pyyaml, rich, etc.
-python -m pop_setup_cli
-```
-
-Main menu:
+## 🖥️ CLI Overview
 ```
 Pop Setup
 1) Install all
@@ -66,13 +81,13 @@ profiles:
   developer_pc:
     description: "Full developer workstation"
     scripts:
-      - git
+      - system_prep
       - docker
-      - conda
+      - nodejs
   project_pc:
     description: "Project runtime machine"
     scripts:
-      - git
+      - system_prep
       - docker
 ```
 
@@ -82,13 +97,13 @@ Add a new component by:
 3. Referencing its `id` in any profile inside `configs/profiles.yml`.
 
 ## 📜 Sample Scripts
-The repo ships with placeholder scripts for Git, Docker, and Miniconda. Each script is bash-based with safe `echo`/`sleep` commands so you can observe the CLI flow without changing your system. Replace them with real install logic once you’re ready.
+The repo ships with placeholder scripts for Git, Docker, runtimes, desktop apps, and more. Each script is bash-based with safe `echo`/`sleep` commands so you can observe the CLI flow without changing your system. Replace them with real install logic once you’re ready.
 
 ## 🧪 Development Notes
 - Python 3.x, 4-space indentation, minimal comments per project guidelines.
 - Execution uses `subprocess.run(..., check=False)` to stream concise success/failure markers.
 - `pop_setup.sh` is legacy reference only—leave it untouched.
-- Consider installing `rich` for enhanced console styling if desired.
+- Optional dependencies like `rich` can enhance console styling if desired.
 
 ## 🤝 Contributing
 1. Fork & branch.

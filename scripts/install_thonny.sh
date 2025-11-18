@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+wait_for_apt_lock() {
+  while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || \
+        fuser /var/lib/apt/lists/lock >/dev/null 2>&1; do
+    echo "Waiting for apt lock to clear..."
+    sleep 5
+  done
+}
+
+apt_exec() {
+  wait_for_apt_lock
+  sudo DEBIAN_FRONTEND=noninteractive apt-get "$@"
+}
+
+if command -v thonny >/dev/null 2>&1; then
+  echo "Thonny already installed"
+  exit 0
+fi
+
+apt_exec install -y thonny
