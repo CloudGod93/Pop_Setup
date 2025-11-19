@@ -45,9 +45,6 @@ class InstallController:
         self._actions.put(action)
 
     def _prompt_loop(self) -> None:
-        self.console.print(
-            "\n[dim]Controls active. Type 1 (status), 2 (skip), or 3 (cancel) and press Enter.[/dim]"
-        )
         while not self._stop_event.is_set():
             ready, _, _ = select.select([sys.stdin], [], [], 0.2)
             if self._stop_event.is_set():
