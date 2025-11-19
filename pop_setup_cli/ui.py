@@ -20,7 +20,6 @@ from rich.table import Table
 
 from .controls import InstallController
 from .hardware import HardwareState
-from .log_buffer import LogBuffer
 from .models import ExecutionResult, Script
 
 console = Console()
@@ -193,14 +192,11 @@ class InstallProgress:
     scripts: Sequence[Script]
     statuses: Dict[str, str] = field(default_factory=dict)
     live: Optional[Live] = None
-    log_buffer: Optional[LogBuffer] = None
     controller: Optional[InstallController] = None
 
     def __post_init__(self) -> None:
         for script in self.scripts:
             self.statuses[script.id] = "PENDING"
-        if self.controller:
-            self.controller.set_tracker(self)
 
     def hook(
         self,
@@ -263,7 +259,10 @@ class InstallProgress:
             title="Install Progress",
         )
         controls_message = (
-            "1 = Status  |  2 = Skip  |  3 = Cancel"
+            "[bold]Controls[/bold]\n"
+            "1 = Skip current script\n"
+            "2 = Cancel run\n"
+            "[dim]Actions take effect after the current script finishes.[/dim]"
         )
         controls_panel = Panel(
             controls_message,
@@ -278,27 +277,6 @@ class InstallProgress:
     def refresh(self) -> None:
         if self.live:
             self.live.update(self.render())
-
-    def show_log_view(self, lines: int = 50) -> None:
-        if not self.live or not self.log_buffer:
-            return
-        log_lines = self.log_buffer.tail(lines)
-        body = "\n".join(log_lines) if log_lines else "[dim]No output captured yet.[/dim]"
-        title_count = min(len(log_lines), lines)
-        with self.live.pause():
-            self.live.console.clear()
-            self.live.console.print(
-                Panel(
-                    body,
-                    border_style="cyan",
-                    title=f"Last {title_count} lines" if log_lines else "Install output",
-                )
-            )
-            try:
-                self.live.console.input("\n[dim]Press Enter to return to the installer...[/dim]")
-            except (KeyboardInterrupt, EOFError):
-                pass
-        self.refresh()
 
 
 @contextmanager
@@ -321,13 +299,12 @@ def install_progress(scripts_to_run: Sequence[Script]):
         "[cyan]Preparing install[/cyan]",
         total=total_scripts,
     )
-    log_buffer = LogBuffer()
     controller = InstallController(console)
+    controller.start()
     tracker = InstallProgress(
         progress,
         overall_task,
         scripts_to_run,
-        log_buffer=log_buffer,
         controller=controller,
     )
     try:
@@ -338,7 +315,6 @@ def install_progress(scripts_to_run: Sequence[Script]):
             transient=True,
         ) as live:
             tracker.set_live(live)
-            controller.start()
             yield tracker
     finally:
         controller.stop()

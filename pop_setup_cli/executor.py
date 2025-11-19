@@ -1,13 +1,10 @@
 from __future__ import annotations
 
 import subprocess
-import threading
-import time
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Sequence, Protocol, Tuple
+from typing import Callable, Dict, List, Optional, Sequence, Protocol
 
 from .hardware import HardwareDetector, HardwareState
-from .log_buffer import LogBuffer
 from .models import ExecutionResult, Profile, Script
 
 ProgressHook = Callable[[str, int, int, Script, Optional[str]], None]
@@ -37,7 +34,6 @@ class Executor:
         profile_id: str,
         progress_hook: Optional[ProgressHook] = None,
         controller: Optional[InstallControl] = None,
-        log_buffer: Optional[LogBuffer] = None,
     ) -> List[ExecutionResult]:
         if profile_id not in self.profiles:
             raise ValueError(f"Unknown profile '{profile_id}'")
@@ -46,7 +42,6 @@ class Executor:
             profile.scripts,
             progress_hook=progress_hook,
             controller=controller,
-            log_buffer=log_buffer,
         )
 
     def run_scripts(
@@ -54,7 +49,6 @@ class Executor:
         script_ids: Sequence[str],
         progress_hook: Optional[ProgressHook] = None,
         controller: Optional[InstallControl] = None,
-        log_buffer: Optional[LogBuffer] = None,
     ) -> List[ExecutionResult]:
         results: List[ExecutionResult] = []
         total = len(script_ids)
@@ -84,22 +78,11 @@ class Executor:
                 continue
             if progress_hook:
                 progress_hook("start", index, total, script, None)
-            script_results, script_action = self._run_install_flow(
-                script,
-                controller=controller,
-                log_buffer=log_buffer,
-            )
+            script_results = self._run_install_flow(script)
             results.extend(script_results)
             final_status = script_results[-1].status if script_results else "DONE"
-            event = (
-                "cancel"
-                if script_action == "cancel"
-                else ("skip" if final_status == "SKIP" else "end")
-            )
             if progress_hook:
-                progress_hook(event, index, total, script, final_status)
-            if script_action == "cancel":
-                break
+                progress_hook("end", index, total, script, final_status)
         return results
 
     def run_all_checks(self) -> List[ExecutionResult]:
@@ -113,18 +96,12 @@ class Executor:
             results.append(self._run_check(script))
         return results
 
-    def _run_install_flow(
-        self,
-        script: Script,
-        controller: Optional[InstallControl] = None,
-        log_buffer: Optional[LogBuffer] = None,
-    ) -> Tuple[List[ExecutionResult], Optional[str]]:
+    def _run_install_flow(self, script: Script) -> List[ExecutionResult]:
         results: List[ExecutionResult] = []
-        action: Optional[str] = None
         check_result = self._run_check(script)
         results.append(check_result)
         if check_result.status == "OK":
-            return results, action
+            return results
         results.append(
             ExecutionResult(
                 script_id=script.id,
@@ -134,31 +111,19 @@ class Executor:
                 message="Running install script",
             )
         )
-        if log_buffer:
-            log_buffer.clear()
-        exec_result = self._run_streaming_path(
-            script.script_path,
-            log_buffer=log_buffer,
-            controller=controller,
-        )
-        status_code, stdout, stderr, action = exec_result
-        if action == "skip":
-            results.append(self._user_skip_result(script))
-        elif action == "cancel":
-            results.append(self._user_cancel_result(script))
-        else:
-            results.append(
-                ExecutionResult(
-                    script_id=script.id,
-                    script_name=script.name,
-                    phase="install",
-                    status="DONE" if status_code == 0 else "FAIL",
-                    message=self._format_message(stdout, stderr)
-                    if status_code != 0
-                    else stdout.strip() or "Completed",
-                )
+        exec_result = self._run_path(script.script_path)
+        results.append(
+            ExecutionResult(
+                script_id=script.id,
+                script_name=script.name,
+                phase="install",
+                status="DONE" if exec_result[0] == 0 else "FAIL",
+                message=self._format_message(exec_result[1], exec_result[2])
+                if exec_result[0] != 0
+                else exec_result[1].strip() or "Completed",
             )
-        return results, action
+        )
+        return results
 
     def _run_check(self, script: Script) -> ExecutionResult:
         if not script.check_path:
@@ -181,67 +146,6 @@ class Executor:
             status=status,
             message=message,
         )
-
-    def _run_streaming_path(
-        self,
-        relative_path: str,
-        log_buffer: Optional[LogBuffer] = None,
-        controller: Optional[InstallControl] = None,
-    ) -> Tuple[int, str, str, Optional[str]]:
-        path = (self.base_path / relative_path).resolve()
-        if not path.exists():
-            return 1, "", f"Script not found: {path}", None
-        cmd = self._build_command(path)
-        process = subprocess.Popen(
-            cmd,
-            cwd=self.base_path,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            bufsize=1,
-        )
-        stdout_lines: List[str] = []
-        stderr_lines: List[str] = []
-
-        def read_stream(stream, sink: List[str], push_to_buffer: bool = False) -> None:
-            if not stream:
-                return
-            for line in stream:
-                sink.append(line)
-                if push_to_buffer and log_buffer:
-                    log_buffer.append(line.rstrip("\n"))
-
-        stdout_thread = threading.Thread(
-            target=read_stream,
-            args=(process.stdout, stdout_lines, True),
-            daemon=True,
-        )
-        stderr_thread = threading.Thread(
-            target=read_stream,
-            args=(process.stderr, stderr_lines, False),
-            daemon=True,
-        )
-        stdout_thread.start()
-        stderr_thread.start()
-        action: Optional[str] = None
-        try:
-            while True:
-                if process.poll() is not None:
-                    break
-                action = self._consume_control_action(controller)
-                if action in {"skip", "cancel"}:
-                    process.terminate()
-                    try:
-                        process.wait(timeout=5)
-                    except subprocess.TimeoutExpired:
-                        process.kill()
-                    break
-                time.sleep(0.2)
-        finally:
-            stdout_thread.join()
-            stderr_thread.join()
-        return_code = process.wait()
-        return return_code, "".join(stdout_lines), "".join(stderr_lines), action
 
     def _run_path(self, relative_path: str) -> tuple[int, str, str]:
         path = (self.base_path / relative_path).resolve()
