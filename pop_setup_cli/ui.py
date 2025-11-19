@@ -18,7 +18,6 @@ from rich.progress import (
 )
 from rich.table import Table
 
-from .controls import InstallController
 from .hardware import HardwareState
 from .models import ExecutionResult, Script
 
@@ -30,7 +29,6 @@ STATUS_STYLES = {
     "RUN": "cyan",
     "FAIL": "red",
     "SKIP": "yellow",
-    "CANCEL": "red",
 }
 
 
@@ -192,7 +190,6 @@ class InstallProgress:
     scripts: Sequence[Script]
     statuses: Dict[str, str] = field(default_factory=dict)
     live: Optional[Live] = None
-    controller: Optional[InstallController] = None
 
     def __post_init__(self) -> None:
         for script in self.scripts:
@@ -225,10 +222,6 @@ class InstallProgress:
             self._set_status(script.id, final_status or "SKIP")
             if index == total:
                 self.progress.update(self.overall_task, description="[green]Install complete[/green]")
-        elif event == "cancel":
-            self.progress.advance(self.overall_task)
-            self._set_status(script.id, "CANCEL")
-            self.progress.update(self.overall_task, description="[red]Install cancelled[/red]")
         self.refresh()
 
     def _set_status(self, script_id: str, status: str) -> None:
@@ -258,17 +251,7 @@ class InstallProgress:
             border_style="cyan",
             title="Install Progress",
         )
-        controls_message = (
-            "[bold]Controls[/bold]\n"
-            "1 = Skip current script\n"
-            "2 = Cancel run\n"
-            "[dim]Actions take effect after the current script finishes.[/dim]"
-        )
-        controls_panel = Panel(
-            controls_message,
-            border_style="blue",
-        )
-        return Group(progress_panel, status_panel, controls_panel)
+        return Group(progress_panel, status_panel)
 
     def set_live(self, live: Live) -> None:
         self.live = live
@@ -299,22 +282,12 @@ def install_progress(scripts_to_run: Sequence[Script]):
         "[cyan]Preparing install[/cyan]",
         total=total_scripts,
     )
-    controller = InstallController(console)
-    controller.start()
-    tracker = InstallProgress(
-        progress,
-        overall_task,
-        scripts_to_run,
-        controller=controller,
-    )
-    try:
-        with Live(
-            tracker.render(),
-            console=console,
-            refresh_per_second=8,
-            transient=True,
-        ) as live:
-            tracker.set_live(live)
-            yield tracker
-    finally:
-        controller.stop()
+    tracker = InstallProgress(progress, overall_task, scripts_to_run)
+    with Live(
+        tracker.render(),
+        console=console,
+        refresh_per_second=8,
+        transient=True,
+    ) as live:
+        tracker.set_live(live)
+        yield tracker
