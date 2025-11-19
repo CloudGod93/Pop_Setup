@@ -27,10 +27,13 @@ def main() -> None:
                     ui.show_message("Unknown profile selection.", "red")
                     ui.wait_for_enter()
                     continue
+                hardware_state = executor.refresh_hardware_state()
+                ui.show_hardware_summary(hardware_state)
                 ui.show_status(f"Running profile: {profile.description or profile.id}")
                 heading = f"Install all ({profile.description or profile.id})"
                 scripts_to_run = profile.scripts
-                with ui.install_progress(len(scripts_to_run)) as tracker:
+                script_objects = [scripts[sid] for sid in scripts_to_run if sid in scripts]
+                with ui.install_progress(script_objects) as tracker:
                     hook = tracker.hook if tracker else None
                     results = executor.run_profile(profile_id, progress_hook=hook)
                 ui.display_results(results, heading)
@@ -47,8 +50,11 @@ def main() -> None:
                     ui.show_message("No scripts selected.", "yellow")
                     ui.wait_for_enter()
                     continue
+                hardware_state = executor.refresh_hardware_state()
+                ui.show_hardware_summary(hardware_state)
                 ui.show_status("Running selected scripts")
-                with ui.install_progress(len(selection)) as tracker:
+                script_objects = [scripts[sid] for sid in selection if sid in scripts]
+                with ui.install_progress(script_objects) as tracker:
                     hook = tracker.hook if tracker else None
                     results = executor.run_scripts(selection, progress_hook=hook)
                 ui.display_results(results, "Install selected")
@@ -56,6 +62,8 @@ def main() -> None:
                 ui.wait_for_enter()
             elif choice == "3":
                 ui.clear_screen()
+                hardware_state = executor.refresh_hardware_state()
+                ui.show_hardware_summary(hardware_state)
                 ui.show_status("Gathering system status")
                 results = executor.run_all_checks()
                 ui.display_results(results, "System status")

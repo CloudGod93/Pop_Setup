@@ -22,6 +22,7 @@ def load_scripts_config(config_path: Path | str) -> Dict[str, Script]:
             description=str(entry.get("description", "")),
             script_path=str(entry["script"]),
             check_path=entry.get("check"),
+            hardware=[str(tag) for tag in entry.get("hardware", []) or []],
         )
         scripts[script.id] = script
     if not scripts:

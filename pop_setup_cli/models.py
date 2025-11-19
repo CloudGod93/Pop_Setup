@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Optional
 
 
@@ -9,6 +9,7 @@ class Script:
     description: str
     script_path: str
     check_path: Optional[str] = None
+    hardware: List[str] = field(default_factory=list)
 
 
 @dataclass

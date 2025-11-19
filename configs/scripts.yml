@@ -9,6 +9,8 @@ scripts:
     description: "Install NVIDIA driver, CUDA 11.8, and cuDNN"
     script: "scripts/install_nvidia_cuda.sh"
     check: "scripts/check_nvidia_cuda.sh"
+    hardware:
+      - gpu
   - id: docker
     name: "Docker Engine"
     description: "Install Docker Engine and configure user access"
@@ -87,6 +89,8 @@ scripts:
     name: "USB data sync"
     description: "Sync project data and documents from the USB drive"
     script: "scripts/sync_from_usb.sh"
+    hardware:
+      - usb_drive
   - id: desktop_shortcuts
     name: "Desktop shortcuts"
     description: "Deploy desktop shortcuts and launcher permissions"

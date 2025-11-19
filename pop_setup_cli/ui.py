@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Sequence
 
-from rich.console import Console
+from rich.console import Console, Group
+from rich.live import Live
 from rich.panel import Panel
 from rich.progress import (
     BarColumn,
     Progress,
+    SpinnerColumn,
     TaskID,
     TextColumn,
     TimeElapsedColumn,
@@ -16,6 +18,7 @@ from rich.progress import (
 )
 from rich.table import Table
 
+from .hardware import HardwareState
 from .models import ExecutionResult, Script
 
 console = Console()
@@ -156,35 +159,117 @@ def show_status(message: str) -> None:
     console.print(Panel.fit(message, border_style="cyan"))
 
 
+def show_hardware_summary(state: HardwareState) -> None:
+    gpu_line = (
+        f"[green]NVIDIA GPU detected[/green] ({state.gpu_description})"
+        if state.has_nvidia_gpu and state.gpu_description
+        else (
+            "[green]NVIDIA GPU detected[/green]"
+            if state.has_nvidia_gpu
+            else "[yellow]No NVIDIA GPU detected[/yellow]"
+        )
+    )
+    usb_line = (
+        f"[green]USB drive detected[/green]: {state.usb_mount}"
+        if state.usb_present
+        else "[yellow]USB drive not detected[/yellow]"
+    )
+    console.print(
+        Panel.fit(
+            f"{gpu_line}\n{usb_line}",
+            border_style="magenta",
+            title="Hardware Check",
+        )
+    )
+
+
 @dataclass
 class InstallProgress:
     progress: Progress
     overall_task: TaskID
-    current_task: TaskID
+    scripts: Sequence[Script]
+    statuses: Dict[str, str] = field(default_factory=dict)
+    live: Optional[Live] = None
 
-    def hook(self, event: str, index: int, total: int, script: Script) -> None:
+    def __post_init__(self) -> None:
+        for script in self.scripts:
+            self.statuses[script.id] = "PENDING"
+
+    def hook(
+        self,
+        event: str,
+        index: int,
+        total: int,
+        script: Script,
+        final_status: Optional[str] = None,
+    ) -> None:
         if total <= 0:
             return
         if event == "start":
             description = f"[cyan]{script.name}[/cyan] ({index}/{total})"
-            self.progress.update(
-                self.current_task,
-                total=1,
-                completed=0,
-                description=description,
-                visible=True,
-            )
+            self.progress.update(self.overall_task, description=description)
+            self._set_status(script.id, "RUN")
         elif event == "end":
-            self.progress.update(self.current_task, completed=1)
             self.progress.advance(self.overall_task)
+            resolved_status = final_status or "DONE"
+            self._set_status(script.id, resolved_status)
+            if index == total:
+                self.progress.update(self.overall_task, description="[green]Install complete[/green]")
+        elif event == "skip":
+            description = f"[yellow]{script.name}[/yellow] ({index}/{total})"
+            self.progress.update(self.overall_task, description=description)
+            self.progress.advance(self.overall_task)
+            self._set_status(script.id, final_status or "SKIP")
+            if index == total:
+                self.progress.update(self.overall_task, description="[green]Install complete[/green]")
+        self.refresh()
+
+    def _set_status(self, script_id: str, status: str) -> None:
+        if script_id not in self.statuses:
+            return
+        self.statuses[script_id] = status.upper()
+
+    def _status_table(self) -> Table:
+        table = Table(show_header=True, header_style="bold magenta")
+        table.add_column("Script", min_width=24)
+        table.add_column("Status", style="bold", width=10)
+        for script in self.scripts:
+            status = self.statuses.get(script.id, "PENDING")
+            style = STATUS_STYLES.get(status.upper(), "white")
+            label = f"[{style}]{status}[/{style}]"
+            table.add_row(script.name, label)
+        return table
+
+    def render(self):
+        status_panel = Panel(
+            self._status_table(),
+            border_style="magenta",
+            title="Script Status",
+        )
+        progress_panel = Panel(
+            self.progress,
+            border_style="cyan",
+            title="Install Progress",
+        )
+        return Group(progress_panel, status_panel)
+
+    def set_live(self, live: Live) -> None:
+        self.live = live
+        self.refresh()
+
+    def refresh(self) -> None:
+        if self.live:
+            self.live.update(self.render())
 
 
 @contextmanager
-def install_progress(total_scripts: int):
+def install_progress(scripts_to_run: Sequence[Script]):
+    total_scripts = len(scripts_to_run)
     if total_scripts <= 0:
         yield None
         return
     columns = (
+        SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
         BarColumn(bar_width=None),
         TextColumn("{task.completed}/{task.total}"),
@@ -193,8 +278,16 @@ def install_progress(total_scripts: int):
         TimeRemainingColumn(),
     )
     progress = Progress(*columns, console=console, transient=True)
-    with progress:
-        overall_task = progress.add_task("Overall", total=total_scripts)
-        current_task = progress.add_task("Current script", total=1)
-        tracker = InstallProgress(progress, overall_task, current_task)
+    overall_task = progress.add_task(
+        "[cyan]Preparing install[/cyan]",
+        total=total_scripts,
+    )
+    tracker = InstallProgress(progress, overall_task, scripts_to_run)
+    with Live(
+        tracker.render(),
+        console=console,
+        refresh_per_second=8,
+        transient=True,
+    ) as live:
+        tracker.set_live(live)
         yield tracker

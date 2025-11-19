@@ -4,9 +4,10 @@ import subprocess
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Sequence
 
+from .hardware import HardwareDetector, HardwareState
 from .models import ExecutionResult, Profile, Script
 
-ProgressHook = Callable[[str, int, int, Script], None]
+ProgressHook = Callable[[str, int, int, Script, Optional[str]], None]
 
 
 class Executor:
@@ -15,10 +16,13 @@ class Executor:
         scripts: Dict[str, Script],
         profiles: Dict[str, Profile],
         base_path: Path,
+        hardware_detector: Optional[HardwareDetector] = None,
     ) -> None:
         self.scripts = scripts
         self.profiles = profiles
         self.base_path = base_path
+        self.hardware_detector = hardware_detector or HardwareDetector()
+        self._hardware_state: Optional[HardwareState] = None
 
     def run_profile(
         self,
@@ -37,20 +41,34 @@ class Executor:
     ) -> List[ExecutionResult]:
         results: List[ExecutionResult] = []
         total = len(script_ids)
+        hardware_state = self.get_hardware_state()
         for index, script_id in enumerate(script_ids, start=1):
             script = self.scripts.get(script_id)
             if not script:
                 raise ValueError(f"Unknown script '{script_id}'")
+            skip_reason = self._hardware_skip_reason(script, hardware_state)
+            if skip_reason:
+                results.append(self._hardware_skip_result(script, skip_reason))
+                if progress_hook:
+                    progress_hook("skip", index, total, script, "SKIP")
+                continue
             if progress_hook:
-                progress_hook("start", index, total, script)
-            results.extend(self._run_install_flow(script))
+                progress_hook("start", index, total, script, None)
+            script_results = self._run_install_flow(script)
+            results.extend(script_results)
+            final_status = script_results[-1].status if script_results else "DONE"
             if progress_hook:
-                progress_hook("end", index, total, script)
+                progress_hook("end", index, total, script, final_status)
         return results
 
     def run_all_checks(self) -> List[ExecutionResult]:
         results: List[ExecutionResult] = []
+        hardware_state = self.get_hardware_state()
         for script in self.scripts.values():
+            skip_reason = self._hardware_skip_reason(script, hardware_state)
+            if skip_reason:
+                results.append(self._hardware_skip_result(script, skip_reason))
+                continue
             results.append(self._run_check(script))
         return results
 
@@ -129,3 +147,47 @@ class Executor:
     def _format_message(stdout: str, stderr: str) -> str:
         output = stderr.strip() or stdout.strip()
         return output or ""
+
+    def describe_hardware(self) -> str:
+        state = self.get_hardware_state()
+        gpu_part = (
+            f"NVIDIA GPU detected ({state.gpu_description})"
+            if state.has_nvidia_gpu and state.gpu_description
+            else ("NVIDIA GPU detected" if state.has_nvidia_gpu else "No NVIDIA GPU detected")
+        )
+        usb_part = (
+            f"USB drive mounted at {state.usb_mount}"
+            if state.usb_present
+            else "USB drive not detected"
+        )
+        return f"{gpu_part}; {usb_part}"
+
+    def get_hardware_state(self) -> HardwareState:
+        if not self._hardware_state:
+            self._hardware_state = self.hardware_detector.detect()
+        return self._hardware_state
+
+    def refresh_hardware_state(self) -> HardwareState:
+        self._hardware_state = self.hardware_detector.detect()
+        return self._hardware_state
+
+    @staticmethod
+    def _hardware_skip_result(script: Script, reason: str) -> ExecutionResult:
+        return ExecutionResult(
+            script_id=script.id,
+            script_name=script.name,
+            phase="hardware",
+            status="SKIP",
+            message=reason,
+        )
+
+    @staticmethod
+    def _hardware_skip_reason(script: Script, state: HardwareState) -> Optional[str]:
+        if not script.hardware:
+            return None
+        requirements = {req.lower() for req in script.hardware}
+        if "gpu" in requirements and not state.has_nvidia_gpu:
+            return "Skipped: NVIDIA GPU not detected"
+        if "usb_drive" in requirements and not state.usb_present:
+            return "Skipped: required USB drive not detected"
+        return None
