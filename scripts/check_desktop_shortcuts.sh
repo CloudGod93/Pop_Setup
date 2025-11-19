@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-DESKTOP_DIR="$HOME/Desktop"
+APPLICATIONS_DIR="$HOME/.local/share/applications"
 FILES=(
   "RibbingApp.desktop"
 )
 
 missing=0
 for file in "${FILES[@]}"; do
-  if [[ ! -f "$DESKTOP_DIR/$file" ]]; then
+  if [[ ! -f "$APPLICATIONS_DIR/$file" ]]; then
     echo "Missing desktop shortcut: $file"
     missing=1
   fi

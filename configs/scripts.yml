@@ -21,6 +21,11 @@ scripts:
     description: "Add Microsoft repo and install VS Code"
     script: "scripts/install_vscode.sh"
     check: "scripts/check_vscode.sh"
+  - id: azure_data_studio
+    name: "Azure Data Studio"
+    description: "Install Azure Data Studio SQL client"
+    script: "scripts/install_azure_data_studio.sh"
+    check: "scripts/check_azure_data_studio.sh"
   - id: google_chrome
     name: "Google Chrome"
     description: "Install Google Chrome browser"
@@ -31,6 +36,11 @@ scripts:
     description: "Download and install TeamViewer"
     script: "scripts/install_teamviewer.sh"
     check: "scripts/check_teamviewer.sh"
+  - id: rusk
+    name: "Rusk (RustDesk)"
+    description: "Install the Rusk (RustDesk) remote desktop client"
+    script: "scripts/install_rusk.sh"
+    check: "scripts/check_rusk.sh"
   - id: thonny
     name: "Thonny"
     description: "Install Thonny Python IDE"

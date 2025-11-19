@@ -6,8 +6,10 @@ profiles:
       - nvidia_cuda
       - docker
       - vscode
+      - azure_data_studio
       - google_chrome
       - teamviewer
+      - rusk
       - thonny
       - flatpak_apps
       - zellij
@@ -29,6 +31,7 @@ profiles:
       - nvidia_cuda
       - docker
       - google_chrome
+      - rusk
       - flatpak_apps
       - nodejs
       - git
