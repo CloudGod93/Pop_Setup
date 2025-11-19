@@ -2,12 +2,17 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Sequence
+from typing import Callable, Dict, List, Optional, Sequence, Protocol
 
 from .hardware import HardwareDetector, HardwareState
 from .models import ExecutionResult, Profile, Script
 
 ProgressHook = Callable[[str, int, int, Script, Optional[str]], None]
+
+
+class InstallControl(Protocol):
+    def consume_action(self) -> Optional[str]:
+        ...
 
 
 class Executor:
@@ -28,16 +33,22 @@ class Executor:
         self,
         profile_id: str,
         progress_hook: Optional[ProgressHook] = None,
+        controller: Optional[InstallControl] = None,
     ) -> List[ExecutionResult]:
         if profile_id not in self.profiles:
             raise ValueError(f"Unknown profile '{profile_id}'")
         profile = self.profiles[profile_id]
-        return self.run_scripts(profile.scripts, progress_hook=progress_hook)
+        return self.run_scripts(
+            profile.scripts,
+            progress_hook=progress_hook,
+            controller=controller,
+        )
 
     def run_scripts(
         self,
         script_ids: Sequence[str],
         progress_hook: Optional[ProgressHook] = None,
+        controller: Optional[InstallControl] = None,
     ) -> List[ExecutionResult]:
         results: List[ExecutionResult] = []
         total = len(script_ids)
@@ -46,6 +57,19 @@ class Executor:
             script = self.scripts.get(script_id)
             if not script:
                 raise ValueError(f"Unknown script '{script_id}'")
+            action = self._consume_control_action(controller)
+            if action == "cancel":
+                cancel_result = self._user_cancel_result(script)
+                results.append(cancel_result)
+                if progress_hook:
+                    progress_hook("cancel", index, total, script, "CANCEL")
+                break
+            if action == "skip":
+                skip_result = self._user_skip_result(script)
+                results.append(skip_result)
+                if progress_hook:
+                    progress_hook("skip", index, total, script, "SKIP")
+                continue
             skip_reason = self._hardware_skip_reason(script, hardware_state)
             if skip_reason:
                 results.append(self._hardware_skip_result(script, skip_reason))
@@ -191,3 +215,31 @@ class Executor:
         if "usb_drive" in requirements and not state.usb_present:
             return "Skipped: required USB drive not detected"
         return None
+
+    @staticmethod
+    def _user_skip_result(script: Script) -> ExecutionResult:
+        return ExecutionResult(
+            script_id=script.id,
+            script_name=script.name,
+            phase="install",
+            status="SKIP",
+            message="Skipped by user",
+        )
+
+    @staticmethod
+    def _user_cancel_result(script: Script) -> ExecutionResult:
+        return ExecutionResult(
+            script_id=script.id,
+            script_name=script.name,
+            phase="install",
+            status="CANCEL",
+            message="Install cancelled by user",
+        )
+
+    @staticmethod
+    def _consume_control_action(
+        controller: Optional[InstallControl],
+    ) -> Optional[str]:
+        if not controller:
+            return None
+        return controller.consume_action()
