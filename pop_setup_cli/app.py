@@ -36,10 +36,12 @@ def main() -> None:
                 with ui.install_progress(script_objects) as tracker:
                     hook = tracker.hook if tracker else None
                     controller = tracker.controller if tracker else None
+                    log_buffer = tracker.log_buffer if tracker else None
                     results = executor.run_profile(
                         profile_id,
                         progress_hook=hook,
                         controller=controller,
+                        log_buffer=log_buffer,
                     )
                 ui.display_results(results, heading)
                 ui.print_run_summary(results)
@@ -62,10 +64,12 @@ def main() -> None:
                 with ui.install_progress(script_objects) as tracker:
                     hook = tracker.hook if tracker else None
                     controller = tracker.controller if tracker else None
+                    log_buffer = tracker.log_buffer if tracker else None
                     results = executor.run_scripts(
                         selection,
                         progress_hook=hook,
                         controller=controller,
+                        log_buffer=log_buffer,
                     )
                 ui.display_results(results, "Install selected")
                 ui.print_run_summary(results)
