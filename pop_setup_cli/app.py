@@ -35,7 +35,12 @@ def main() -> None:
                 script_objects = [scripts[sid] for sid in scripts_to_run if sid in scripts]
                 with ui.install_progress(script_objects) as tracker:
                     hook = tracker.hook if tracker else None
-                    results = executor.run_profile(profile_id, progress_hook=hook)
+                    controller = tracker.controller if tracker else None
+                    results = executor.run_profile(
+                        profile_id,
+                        progress_hook=hook,
+                        controller=controller,
+                    )
                 ui.display_results(results, heading)
                 ui.print_run_summary(results)
                 ui.wait_for_enter()
@@ -56,7 +61,12 @@ def main() -> None:
                 script_objects = [scripts[sid] for sid in selection if sid in scripts]
                 with ui.install_progress(script_objects) as tracker:
                     hook = tracker.hook if tracker else None
-                    results = executor.run_scripts(selection, progress_hook=hook)
+                    controller = tracker.controller if tracker else None
+                    results = executor.run_scripts(
+                        selection,
+                        progress_hook=hook,
+                        controller=controller,
+                    )
                 ui.display_results(results, "Install selected")
                 ui.print_run_summary(results)
                 ui.wait_for_enter()
