@@ -18,6 +18,8 @@ from rich.progress import (
 )
 from rich.table import Table
 
+from rich.text import Text
+
 from .controls import InstallController
 from .hardware import HardwareState
 from .log_buffer import LogBuffer
@@ -252,8 +254,12 @@ class InstallProgress:
         return table
 
     def render(self):
+        controls_message = Text(
+            "Controls: 1 = Status  |  2 = Skip  |  3 = Cancel",
+            style="dim",
+        )
         status_panel = Panel(
-            self._status_table(),
+            Group(self._status_table(), controls_message),
             border_style="magenta",
             title="Script Status",
         )
@@ -262,14 +268,7 @@ class InstallProgress:
             border_style="cyan",
             title="Install Progress",
         )
-        controls_message = (
-            "1 = Status  |  2 = Skip  |  3 = Cancel"
-        )
-        controls_panel = Panel(
-            controls_message,
-            border_style="blue",
-        )
-        return Group(progress_panel, status_panel, controls_panel)
+        return Group(progress_panel, status_panel)
 
     def set_live(self, live: Live) -> None:
         self.live = live
